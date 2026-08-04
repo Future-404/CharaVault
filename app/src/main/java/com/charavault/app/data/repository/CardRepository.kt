@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.InputStream
 import java.util.UUID
@@ -23,30 +24,33 @@ class CardRepository(private val context: Context) {
         if (!exists()) mkdirs()
     }
 
-    private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
+    private val json = Json { ignoreUnknownKeys = true; prettyPrint = true; isLenient = true }
 
     fun getAllCards(): Flow<List<CardEntity>> = cardDao.getAllCardsFlow()
 
-    suspend fun importCardFromStream(inputStream: InputStream, originalFileName: String?): Boolean = withContext(Dispatchers.IO) {
+    suspend fun importCardStream(inputStream: InputStream, originalFileName: String?): Boolean = withContext(Dispatchers.IO) {
         try {
             val bytes = inputStream.readBytes()
             val cardV3 = PngChunkUtils.extractCardFromJsonPng(ByteArrayInputStream(bytes))
-                ?: createDefaultCardV3(originalFileName ?: "New Character")
+                ?: createDefaultCardV3(originalFileName ?: "新角色卡")
 
             val id = UUID.randomUUID().toString().take(8)
             val destFile = File(cardsDir, "chara_$id.png")
 
-            // Ensure PNG has embedded JSON V3
             val jsonStr = json.encodeToString(cardV3)
             val finalPngBytes = PngChunkUtils.injectJsonIntoPng(bytes, jsonStr)
             destFile.writeBytes(finalPngBytes)
 
-            val tags = if (cardV3.data.tags.isEmpty()) listOf("未分类") else cardV3.data.tags
+            val rawTags = cardV3.data.tags
+            val tags = if (rawTags.isEmpty()) listOf("未分类") else rawTags
+
+            val name = cardV3.data.name.ifBlank { originalFileName?.substringBeforeLast(".") ?: "未命名角色" }
+            val creator = cardV3.data.creator.ifBlank { "未知作者" }
 
             val entity = CardEntity(
                 id = id,
-                name = cardV3.data.name.ifBlank { originalFileName?.substringBeforeLast(".") ?: "未命名角色" },
-                creator = cardV3.data.creator.ifBlank { "未知作者" },
+                name = name,
+                creator = creator,
                 description = cardV3.data.description,
                 personality = cardV3.data.personality,
                 scenario = cardV3.data.scenario,
