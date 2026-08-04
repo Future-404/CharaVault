@@ -24,7 +24,6 @@ import com.charavault.app.ui.viewmodel.CardGroup
 fun CategoryRow(
     group: CardGroup,
     onCardClick: (CardEntity) -> Unit,
-    onFavoriteToggle: (CardEntity) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxWidth().padding(vertical = 10.dp)) {
@@ -58,8 +57,7 @@ fun CategoryRow(
             items(group.cards, key = { it.id }) { card ->
                 CardItem(
                     card = card,
-                    onClick = { onCardClick(card) },
-                    onFavoriteToggle = { onFavoriteToggle(card) }
+                    onClick = { onCardClick(card) }
                 )
             }
         }

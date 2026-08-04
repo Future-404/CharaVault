@@ -31,7 +31,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val allCards: StateFlow<List<CardEntity>> = repository.getAllCards()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    // Grouped Cards according to user design: Favorite group + Category groups
+    // Grouped Cards: Favorite group + Category tag groups
     val groupedCards: StateFlow<List<CardGroup>> = combine(allCards, searchQuery, selectedTagFilter) { cards, query, tagFilter ->
         val filtered = cards.filter { card ->
             val matchesQuery = query.isBlank() || 
@@ -70,12 +70,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         resultGroups
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun importCardUri(uri: Uri) {
+    fun importCardUri(uri: Uri, selectedTags: List<String> = emptyList()) {
         viewModelScope.launch {
             val contentResolver = getApplication<Application>().contentResolver
             val inputStream = contentResolver.openInputStream(uri) ?: return@launch
             val fileName = uri.lastPathSegment
-            repository.importCardStream(inputStream, fileName)
+            repository.importCardStream(inputStream, fileName, selectedTags)
+        }
+    }
+
+    fun updateCardTags(cardId: String, newTags: List<String>) {
+        viewModelScope.launch {
+            repository.updateCardTags(cardId, newTags)
         }
     }
 

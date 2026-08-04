@@ -10,17 +10,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,14 +31,15 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.charavault.app.data.local.CardEntity
-import com.charavault.app.ui.theme.GoldStar
 import java.io.File
 
+/**
+ * Clean & Aesthetic Character Card Item without corner badges
+ */
 @Composable
 fun CardItem(
     card: CardEntity,
     onClick: () -> Unit,
-    onFavoriteToggle: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -58,7 +52,7 @@ fun CardItem(
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // Card Cover Image
+            // Full Cover Image
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
                     .data(File(card.imagePath))
@@ -69,11 +63,11 @@ fun CardItem(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Gradient Overlay at bottom for readable text
+            // Subtle Bottom Gradient Mask for name readability
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(80.dp)
+                    .height(76.dp)
                     .align(Alignment.BottomCenter)
                     .background(
                         Brush.verticalGradient(
@@ -85,24 +79,7 @@ fun CardItem(
                     )
             )
 
-            // Favorite Star Button at top-right
-            IconButton(
-                onClick = onFavoriteToggle,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(6.dp)
-                    .size(32.dp)
-                    .background(Color.Black.copy(alpha = 0.4f), CircleShape)
-            ) {
-                Icon(
-                    imageVector = if (card.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                    contentDescription = "Favorite",
-                    tint = if (card.isFavorite) GoldStar else Color.White.copy(alpha = 0.8f),
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-
-            // Character Info at bottom
+            // Character Info Text at bottom
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
@@ -118,7 +95,7 @@ fun CardItem(
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "@${card.creator}",
+                    text = "@${card.creator.ifBlank { "未知作者" }}",
                     color = Color.White.copy(alpha = 0.7f),
                     fontSize = 11.sp,
                     maxLines = 1,

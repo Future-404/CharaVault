@@ -28,7 +28,11 @@ class CardRepository(private val context: Context) {
 
     fun getAllCards(): Flow<List<CardEntity>> = cardDao.getAllCardsFlow()
 
-    suspend fun importCardStream(inputStream: InputStream, originalFileName: String?): Boolean = withContext(Dispatchers.IO) {
+    suspend fun importCardStream(
+        inputStream: InputStream,
+        originalFileName: String?,
+        selectedTags: List<String> = emptyList()
+    ): Boolean = withContext(Dispatchers.IO) {
         try {
             val bytes = inputStream.readBytes()
             val cardV3 = PngChunkUtils.extractCardFromJsonPng(ByteArrayInputStream(bytes))
@@ -37,27 +41,35 @@ class CardRepository(private val context: Context) {
             val id = UUID.randomUUID().toString().take(8)
             val destFile = File(cardsDir, "chara_$id.png")
 
-            val jsonStr = json.encodeToString(cardV3)
+            // Determine effective tags
+            val finalTags = if (selectedTags.isNotEmpty()) {
+                selectedTags
+            } else if (cardV3.data.tags.isNotEmpty()) {
+                cardV3.data.tags
+            } else {
+                listOf("未分类")
+            }
+
+            val updatedV3 = cardV3.copy(data = cardV3.data.copy(tags = finalTags))
+            val jsonStr = json.encodeToString(updatedV3)
+
             val finalPngBytes = PngChunkUtils.injectJsonIntoPng(bytes, jsonStr)
             destFile.writeBytes(finalPngBytes)
 
-            val rawTags = cardV3.data.tags
-            val tags = if (rawTags.isEmpty()) listOf("未分类") else rawTags
-
-            val name = cardV3.data.name.ifBlank { originalFileName?.substringBeforeLast(".") ?: "未命名角色" }
-            val creator = cardV3.data.creator.ifBlank { "未知作者" }
+            val name = updatedV3.data.name.ifBlank { originalFileName?.substringBeforeLast(".") ?: "未命名角色" }
+            val creator = updatedV3.data.creator.ifBlank { "未知作者" }
 
             val entity = CardEntity(
                 id = id,
                 name = name,
                 creator = creator,
-                description = cardV3.data.description,
-                personality = cardV3.data.personality,
-                scenario = cardV3.data.scenario,
-                firstMes = cardV3.data.firstMes,
-                systemPrompt = cardV3.data.systemPrompt,
-                tagsJson = json.encodeToString(tags),
-                alternateGreetingsJson = json.encodeToString(cardV3.data.alternateGreetings),
+                description = updatedV3.data.description,
+                personality = updatedV3.data.personality,
+                scenario = updatedV3.data.scenario,
+                firstMes = updatedV3.data.firstMes,
+                systemPrompt = updatedV3.data.systemPrompt,
+                tagsJson = json.encodeToString(finalTags),
+                alternateGreetingsJson = json.encodeToString(updatedV3.data.alternateGreetings),
                 rawJsonData = jsonStr,
                 imagePath = destFile.absolutePath,
                 isFavorite = false
@@ -69,6 +81,34 @@ class CardRepository(private val context: Context) {
             e.printStackTrace()
             false
         }
+    }
+
+    suspend fun updateCardTags(id: String, newTags: List<String>) = withContext(Dispatchers.IO) {
+        val existingCard = cardDao.getCardById(id) ?: return@withContext
+        val effectiveTags = if (newTags.isEmpty()) listOf("未分类") else newTags
+        val tagsJson = json.encodeToString(effectiveTags)
+
+        val updatedRawJson = try {
+            val v3 = json.decodeFromString<CharacterCardV3>(existingCard.rawJsonData)
+            val updatedV3 = v3.copy(data = v3.data.copy(tags = effectiveTags))
+            val jsonStr = json.encodeToString(updatedV3)
+            
+            val file = File(existingCard.imagePath)
+            if (file.exists()) {
+                val updatedPngBytes = PngChunkUtils.injectJsonIntoPng(file.readBytes(), jsonStr)
+                file.writeBytes(updatedPngBytes)
+            }
+            jsonStr
+        } catch (e: Exception) {
+            existingCard.rawJsonData
+        }
+
+        val updatedEntity = existingCard.copy(
+            tagsJson = tagsJson,
+            rawJsonData = updatedRawJson,
+            updatedAt = System.currentTimeMillis()
+        )
+        cardDao.updateCard(updatedEntity)
     }
 
     suspend fun toggleFavorite(id: String, isFavorite: Boolean) = withContext(Dispatchers.IO) {

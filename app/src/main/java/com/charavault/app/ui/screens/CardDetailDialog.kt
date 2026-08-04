@@ -25,15 +25,19 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
@@ -43,11 +47,13 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -78,19 +84,21 @@ fun CardDetailDialog(
     card: CardEntity,
     onDismiss: () -> Unit,
     onFavoriteToggle: () -> Unit,
+    onUpdateTags: (List<String>) -> Unit,
     onDelete: () -> Unit
 ) {
     val context = LocalContext.current
     val jsonParser = remember { Json { ignoreUnknownKeys = true; isLenient = true } }
 
-    // Parse V3 Full JSON
     val cardV3: CharacterCardV3? = remember(card.rawJsonData) {
         try { jsonParser.decodeFromString<CharacterCardV3>(card.rawJsonData) } catch (e: Exception) { null }
     }
 
-    val tags = try { jsonParser.decodeFromString<List<String>>(card.tagsJson) } catch (e: Exception) { emptyList() }
+    val tags = try { jsonParser.decodeFromString<List<String>>(card.tagsJson) } catch (e: Exception) { listOf("未分类") }
     val alternateGreetings = cardV3?.data?.alternateGreetings ?: emptyList()
     val lorebookEntries = cardV3?.data?.characterBook?.entries ?: emptyList()
+
+    var showCategoryEditDialog by remember { mutableStateOf(false) }
 
     // Accordion Expansion States
     var expandGreetings by remember { mutableStateOf(true) }
@@ -116,7 +124,7 @@ fun CardDetailDialog(
                         .verticalScroll(rememberScrollState())
                         .padding(16.dp)
                 ) {
-                    // Top Hero Banner & Image
+                    // Top Hero Banner
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -136,7 +144,7 @@ fun CardDetailDialog(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Character Name & Author
+                    // Name, Creator & Favorite Button
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -166,28 +174,65 @@ fun CardDetailDialog(
                         }
                     }
 
-                    // Tags FlowRow
-                    if (tags.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            tags.forEach { tag ->
-                                AssistChip(
-                                    onClick = { },
-                                    label = { Text("#$tag", fontSize = 11.sp) },
-                                    colors = AssistChipDefaults.assistChipColors(
-                                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Category Tags Bar + Edit Button
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Icon(
+                                Icons.Filled.Label,
+                                contentDescription = "Category",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("分类标签:", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.8f))
+                        }
+
+                        TextButton(onClick = { showCategoryEditDialog = true }) {
+                            Icon(Icons.Filled.Edit, contentDescription = "Edit Categories", modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("修改分类", fontSize = 12.sp)
+                        }
+                    }
+
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showCategoryEditDialog = true }
+                            .padding(vertical = 4.dp)
+                    ) {
+                        tags.forEach { tag ->
+                            AssistChip(
+                                onClick = { showCategoryEditDialog = true },
+                                label = { Text("#$tag", fontSize = 12.sp) },
+                                colors = AssistChipDefaults.assistChipColors(
+                                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                                    labelColor = Color.White
                                 )
-                            }
+                            )
+                        }
+                        if (tags.isEmpty() || (tags.size == 1 && tags.first() == "未分类")) {
+                            AssistChip(
+                                onClick = { showCategoryEditDialog = true },
+                                label = { Text("+ 点击添加分类", fontSize = 12.sp) },
+                                colors = AssistChipDefaults.assistChipColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    labelColor = MaterialTheme.colorScheme.primary
+                                )
+                            )
                         }
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Global Collapse / Expand All Quick Controls
+                    // Global Quick Controls
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End
@@ -214,7 +259,7 @@ fun CardDetailDialog(
                         }
                     }
 
-                    // 1. Accordion Section: 💬 Greetings & Alternate Greetings
+                    // 1. Accordion Section: 💬 Greetings
                     val totalGreetingsCount = 1 + alternateGreetings.size
                     AccordionSection(
                         title = "💬 欢迎语与开场白",
@@ -224,25 +269,16 @@ fun CardDetailDialog(
                         countBadge = "$totalGreetingsCount 条"
                     ) {
                         Column {
-                            // Default First Message
                             if (card.firstMes.isNotBlank()) {
-                                GreetingCardItem(
-                                    label = "📍 默认开场白",
-                                    content = card.firstMes
-                                )
+                                GreetingCardItem(label = "📍 默认开场白", content = card.firstMes)
                             }
-
-                            // Alternate Greetings
                             alternateGreetings.forEachIndexed { index, greeting ->
-                                GreetingCardItem(
-                                    label = "📍 备选欢迎语 #${index + 1}",
-                                    content = greeting
-                                )
+                                GreetingCardItem(label = "📍 备选欢迎语 #${index + 1}", content = greeting)
                             }
                         }
                     }
 
-                    // 2. Accordion Section: 📝 Profile / Description & Personality
+                    // 2. Accordion Section: 📝 Profile
                     AccordionSection(
                         title = "📝 角色设定与背景",
                         icon = Icons.Filled.Person,
@@ -267,7 +303,7 @@ fun CardDetailDialog(
                         }
                     }
 
-                    // 3. Accordion Section: 📚 Character Book / Lorebook (Secondary expansion)
+                    // 3. Accordion Section: 📚 Lorebook
                     if (lorebookEntries.isNotEmpty()) {
                         AccordionSection(
                             title = "📚 世界书 (Lorebook)",
@@ -284,7 +320,7 @@ fun CardDetailDialog(
                         }
                     }
 
-                    // 4. Accordion Section: ⚙️ System Prompts & Instructions
+                    // 4. Accordion Section: ⚙️ System Prompts
                     if (card.systemPrompt.isNotBlank() || cardV3?.data?.postHistoryInstructions?.isNotBlank() == true || cardV3?.data?.creatorNotes?.isNotBlank() == true) {
                         AccordionSection(
                             title = "⚙️ 系统提示词与指令",
@@ -341,117 +377,115 @@ fun CardDetailDialog(
             }
         }
     }
+
+    // Category Edit Dialog
+    if (showCategoryEditDialog) {
+        CategoryEditDialog(
+            currentTags = tags,
+            onDismiss = { showCategoryEditDialog = false },
+            onSave = { newTags ->
+                onUpdateTags(newTags)
+                showCategoryEditDialog = false
+            }
+        )
+    }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun GreetingCardItem(label: String, content: String) {
-    val context = LocalContext.current
-    var isExpanded by remember { mutableStateOf(content.length < 300) }
+fun CategoryEditDialog(
+    currentTags: List<String>,
+    onDismiss: () -> Unit,
+    onSave: (List<String>) -> Unit
+) {
+    val tagList = remember { mutableStateListOf<String>().apply { addAll(currentTags.filter { it != "未分类" }) } }
+    var newTagInput by remember { mutableStateOf("") }
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.5f)),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = label,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
+    val presetCategories = listOf("赛博朋克", "奇幻魔法", "日常恋爱", "助手工具", "原神", "二次元", "特例系")
 
-                IconButton(
-                    onClick = {
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText(label, content))
-                        Toast.makeText(context, "已复制 $label 到剪贴板", Toast.LENGTH_SHORT).show()
-                    },
-                    modifier = Modifier.size(28.dp)
-                ) {
-                    Icon(
-                        Icons.Filled.ContentCopy,
-                        contentDescription = "Copy",
-                        tint = Color.White.copy(alpha = 0.7f),
-                        modifier = Modifier.size(16.dp)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("编辑角色卡分类标签", fontSize = 18.sp, fontWeight = FontWeight.Bold) },
+        text = {
+            Column {
+                Text("输入自定义分类或添加预设标签：", fontSize = 13.sp, color = Color.Gray)
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Custom Input Box
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = newTagInput,
+                        onValueChange = { newTagInput = it },
+                        placeholder = { Text("新分类标签...", fontSize = 12.sp) },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
                     )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            if (newTagInput.isNotBlank() && !tagList.contains(newTagInput.trim())) {
+                                tagList.add(newTagInput.trim())
+                                newTagInput = ""
+                            }
+                        }
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = "Add")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Current Selected Tags
+                Text("已选分类：", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(4.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    tagList.forEach { tag ->
+                        AssistChip(
+                            onClick = { tagList.remove(tag) },
+                            label = { Text("$tag ✕", fontSize = 12.sp) },
+                            colors = AssistChipDefaults.assistChipColors(
+                                containerColor = MaterialTheme.colorScheme.primary
+                            )
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Preset Categories Quick Add
+                Text("快捷预设分类：", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(4.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    presetCategories.forEach { preset ->
+                        val isSelected = tagList.contains(preset)
+                        AssistChip(
+                            onClick = {
+                                if (isSelected) tagList.remove(preset) else tagList.add(preset)
+                            },
+                            label = { Text((if (isSelected) "✓ " else "+ ") + preset, fontSize = 11.sp) },
+                            colors = AssistChipDefaults.assistChipColors(
+                                containerColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        )
+                    }
                 }
             }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            val displayText = if (isExpanded || content.length < 300) content else content.take(300) + "..."
-            Text(
-                text = displayText,
-                fontSize = 13.sp,
-                color = Color.White.copy(alpha = 0.85f),
-                lineHeight = 19.sp
-            )
-
-            if (content.length >= 300) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = if (isExpanded) "▲ 收起全文" else "▼ 展开全文 (共 ${content.length} 字)",
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .clickable { isExpanded = !isExpanded }
-                        .padding(vertical = 2.dp)
-                )
+        },
+        confirmButton = {
+            Button(onClick = { onSave(tagList.toList()) }) {
+                Text("保存分类")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
             }
         }
-    }
-}
-
-@Composable
-fun SubTitleText(title: String) {
-    Text(
-        text = title,
-        fontSize = 13.sp,
-        fontWeight = FontWeight.Bold,
-        color = Color.White.copy(alpha = 0.7f),
-        modifier = Modifier.padding(bottom = 4.dp)
     )
-}
-
-@Composable
-fun ExpandableContentBox(text: String) {
-    var isExpanded by remember { mutableStateOf(text.length < 500) }
-    val displayText = if (isExpanded || text.length < 500) text else text.take(500) + "..."
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
-            .padding(12.dp)
-    ) {
-        Column {
-            Text(
-                text = displayText,
-                fontSize = 13.sp,
-                color = Color.White.copy(alpha = 0.85f),
-                lineHeight = 19.sp
-            )
-            if (text.length >= 500) {
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = if (isExpanded) "▲ 收起全文" else "▼ 展开全文 (共 ${text.length} 字)",
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .clickable { isExpanded = !isExpanded }
-                        .padding(vertical = 2.dp)
-                )
-            }
-        }
-    }
 }
