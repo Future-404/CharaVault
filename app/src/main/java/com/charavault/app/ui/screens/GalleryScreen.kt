@@ -27,11 +27,14 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.FolderZip
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -78,6 +81,7 @@ fun GalleryScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     var selectedCardForDetail by remember { mutableStateOf<CardEntity?>(null) }
     var showGithubAboutDialog by remember { mutableStateOf(false) }
+    var showTopBarMenu by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -98,24 +102,56 @@ fun GalleryScreen(
                     }
                 },
                 actions = {
-                    // Export All Zip Backup Action Button
-                    IconButton(onClick = onExportAllZipClick) {
-                        Icon(
-                            imageVector = Icons.Filled.FolderZip,
-                            contentDescription = "Export All Zip",
-                            tint = Color.White.copy(alpha = 0.85f),
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
+                    // Unified Overflow Menu Button
+                    Box {
+                        IconButton(onClick = { showTopBarMenu = true }) {
+                            Icon(
+                                imageVector = Icons.Filled.MoreVert,
+                                contentDescription = "More Options",
+                                tint = Color.White.copy(alpha = 0.85f),
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
 
-                    // GitHub Top Right Icon Button
-                    IconButton(onClick = { showGithubAboutDialog = true }) {
-                        Icon(
-                            imageVector = Icons.Filled.Code,
-                            contentDescription = "GitHub Repository",
-                            tint = Color.White.copy(alpha = 0.85f),
-                            modifier = Modifier.size(22.dp)
-                        )
+                        DropdownMenu(
+                            expanded = showTopBarMenu,
+                            onDismissRequest = { showTopBarMenu = false },
+                            modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            // Submenu 1: Export All Zip Archive
+                            DropdownMenuItem(
+                                text = { Text("📦 备份全量 Zip 导出", fontSize = 13.sp, color = Color.White) },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Filled.FolderZip,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                },
+                                onClick = {
+                                    showTopBarMenu = false
+                                    onExportAllZipClick()
+                                }
+                            )
+
+                            // Submenu 2: About & GitHub Repository
+                            DropdownMenuItem(
+                                text = { Text("🐙 关于与 GitHub 源码", fontSize = 13.sp, color = Color.White) },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Filled.Code,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                },
+                                onClick = {
+                                    showTopBarMenu = false
+                                    showGithubAboutDialog = true
+                                }
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
