@@ -3,13 +3,27 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    
+    <!-- Background: Sleek Modern Dark Premium Background -->
     <path
-        android:fillColor="#8B5CF6"
-        android:pathData="M0,0h108v108h-108z" />
+        android:pathData="M0,0h108v108h-108z"
+        android:fillColor="#0E0F17" />
+    
+    <!-- Three Minimalist White Lines (Cards / Shelf Minimalist Logo) -->
+    <!-- Line 1 (Top Line) -->
     <path
-        android:fillColor="#EC4899"
-        android:pathData="M24,20h60a8,8 0,0 1,8 8v52a8,8 0,0 1,-8 8h-60a8,8 0,0 1,-8 -8v-52a8,8 0,0 1,8 -8z" />
+        android:pathData="M32,38 h44 c2.2,0 4,1.8 4,4 v0 c0,2.2 -1.8,4 -4,4 h-44 c-2.2,0 -4,-1.8 -4,-4 v0 c0,-2.2 1.8,-4 4,-4 z"
+        android:fillColor="#FFFFFF" />
+        
+    <!-- Line 2 (Middle Line - Slightly offset for dynamic modern feel) -->
     <path
+        android:pathData="M32,50 h44 c2.2,0 4,1.8 4,4 v0 c0,2.2 -1.8,4 -4,4 h-44 c-2.2,0 -4,-1.8 -4,-4 v0 c0,-2.2 1.8,-4 4,-4 z"
         android:fillColor="#FFFFFF"
-        android:pathData="M40,36h28v6h-28zM40,48h28v6h-28zM40,60h18v6h-18z" />
+        android:fillAlpha="0.9" />
+        
+    <!-- Line 3 (Bottom Line) -->
+    <path
+        android:pathData="M32,62 h44 c2.2,0 4,1.8 4,4 v0 c0,2.2 -1.8,4 -4,4 h-44 c-2.2,0 -4,-1.8 -4,-4 v0 c0,-2.2 1.8,-4 4,-4 z"
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.75" />
 </vector>

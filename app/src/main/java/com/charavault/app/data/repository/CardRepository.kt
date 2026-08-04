@@ -45,6 +45,40 @@ class CardRepository(private val context: Context) {
     }
 
     /**
+     * Full edit & update character card data, writing back to physical PNG & Room DB
+     */
+    suspend fun updateFullCardData(id: String, updatedV3: CharacterCardV3) = withContext(Dispatchers.IO) {
+        val existingCard = cardDao.getCardById(id) ?: return@withContext
+        val jsonStr = json.encodeToString(updatedV3)
+
+        // Write back updated JSON to physical PNG chunk
+        val file = File(existingCard.imagePath)
+        if (file.exists()) {
+            val updatedPngBytes = PngChunkUtils.injectJsonIntoPng(file.readBytes(), jsonStr)
+            file.writeBytes(updatedPngBytes)
+        }
+
+        // Re-calculate semantic hash
+        val semanticString = "${updatedV3.data.name.trim().lowercase()}|${updatedV3.data.creator.trim().lowercase()}|${updatedV3.data.description.trim()}"
+        val semanticHash = CardValidator.calculateSha256(semanticString.toByteArray(Charsets.UTF_8))
+
+        val updatedEntity = existingCard.copy(
+            name = updatedV3.data.name,
+            creator = updatedV3.data.creator.ifBlank { "未知作者" },
+            description = updatedV3.data.description,
+            personality = updatedV3.data.personality,
+            scenario = updatedV3.data.scenario,
+            firstMes = updatedV3.data.firstMes,
+            systemPrompt = updatedV3.data.systemPrompt,
+            alternateGreetingsJson = json.encodeToString(updatedV3.data.alternateGreetings),
+            rawJsonData = jsonStr,
+            semanticHash = semanticHash,
+            updatedAt = System.currentTimeMillis()
+        )
+        cardDao.updateCard(updatedEntity)
+    }
+
+    /**
      * Batch import multiple cards with compliance validation & dual-layer hash de-duplication
      */
     suspend fun importCardStreamsBatch(

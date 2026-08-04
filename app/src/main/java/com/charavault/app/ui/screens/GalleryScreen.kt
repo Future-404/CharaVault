@@ -242,6 +242,9 @@ fun GalleryScreen(
                 onUpdateTags = { newTags ->
                     viewModel.updateCardTags(card.id, newTags)
                 },
+                onUpdateFullCard = { updatedV3 ->
+                    viewModel.updateFullCardData(card.id, updatedV3)
+                },
                 onDelete = {
                     viewModel.deleteCard(card)
                     selectedCardForDetail = null

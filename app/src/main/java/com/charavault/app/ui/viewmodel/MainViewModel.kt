@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.charavault.app.data.local.CardEntity
+import com.charavault.app.data.model.CharacterCardV3
 import com.charavault.app.data.repository.BatchImportResult
 import com.charavault.app.data.repository.CardRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,7 +40,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }.filter { it.isNotBlank() && it != "未分类" }.distinct().sorted()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Pure Category Tag Grouped Cards (Clean title without 🏷️ emoji)
+    // Pure Category Tag Grouped Cards
     val groupedCards: StateFlow<List<CardGroup>> = combine(allCards, searchQuery, selectedTagFilter) { cards, query, tagFilter ->
         val filtered = cards.filter { card ->
             val matchesQuery = query.isBlank() || 
@@ -75,6 +76,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun reorderCards(cardIdsInOrder: List<String>) {
         viewModelScope.launch {
             repository.updateCardsOrder(cardIdsInOrder)
+        }
+    }
+
+    fun updateFullCardData(id: String, updatedV3: CharacterCardV3) {
+        viewModelScope.launch {
+            repository.updateFullCardData(id, updatedV3)
         }
     }
 

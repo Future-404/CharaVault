@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -87,6 +88,7 @@ fun CardDetailDialog(
     onDismiss: () -> Unit,
     onExportSingleCard: () -> Unit,
     onUpdateTags: (List<String>) -> Unit,
+    onUpdateFullCard: (CharacterCardV3) -> Unit,
     onDelete: () -> Unit
 ) {
     val context = LocalContext.current
@@ -101,6 +103,7 @@ fun CardDetailDialog(
     val lorebookEntries = cardV3?.data?.characterBook?.entries ?: emptyList()
 
     var showCategoryEditDialog by remember { mutableStateOf(false) }
+    var showCardEditorDialog by remember { mutableStateOf(false) }
 
     // Accordion Expansion States
     var expandGreetings by remember { mutableStateOf(true) }
@@ -146,7 +149,7 @@ fun CardDetailDialog(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Name & Creator
+                    // Name, Creator & Edit Card Button
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -164,6 +167,12 @@ fun CardDetailDialog(
                                 fontSize = 13.sp,
                                 color = MaterialTheme.colorScheme.primary
                             )
+                        }
+
+                        TextButton(onClick = { showCardEditorDialog = true }) {
+                            Icon(Icons.Filled.Edit, contentDescription = "Edit Card", modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("编辑角色卡", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                     }
 
@@ -412,6 +421,18 @@ fun CardDetailDialog(
                 }
             }
         }
+    }
+
+    // Full Card Data Editor Dialog
+    if (showCardEditorDialog) {
+        CardEditorDialog(
+            card = card,
+            onDismiss = { showCardEditorDialog = false },
+            onSave = { updatedV3 ->
+                onUpdateFullCard(updatedV3)
+                showCardEditorDialog = false
+            }
+        )
     }
 
     // Category Edit Dialog
