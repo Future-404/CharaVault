@@ -1,6 +1,10 @@
 package com.charavault.app.ui.screens
 
+import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,7 +24,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Collections
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -29,6 +35,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -47,6 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -58,31 +66,71 @@ import com.charavault.app.ui.viewmodel.MainViewModel
 @Composable
 fun GalleryScreen(
     viewModel: MainViewModel,
-    pendingImportUri: Uri?,
+    pendingImportUris: List<Uri>,
     onImportClick: () -> Unit,
-    onImportConfirmed: (Uri, List<String>) -> Unit,
+    onImportConfirmed: (List<Uri>, List<String>) -> Unit,
     onImportCancelled: () -> Unit
 ) {
+    val context = LocalContext.current
     val groupedCards by viewModel.groupedCards.collectAsState()
+    val existingTags by viewModel.existingTags.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     var selectedCardForDetail by remember { mutableStateOf<CardEntity?>(null) }
+    var showGithubAboutDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text(
-                            text = "CharaVault 🎴",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "个人角色卡珍藏馆",
-                            fontSize = 11.sp,
-                            color = Color.White.copy(alpha = 0.6f)
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "CharaVault 🎴",
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                // Subtle GitHub Badge Button in TopBar
+                                Box(
+                                    modifier = Modifier
+                                        .background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
+                                        .clickable { showGithubAboutDialog = true }
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Code,
+                                            contentDescription = "GitHub Badge",
+                                            tint = Color.White.copy(alpha = 0.7f),
+                                            modifier = Modifier.size(12.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(3.dp))
+                                        Text(
+                                            text = "Future-404",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = Color.White.copy(alpha = 0.7f)
+                                        )
+                                    }
+                                }
+                            }
+                            Text(
+                                text = "个人角色卡珍藏馆",
+                                fontSize = 11.sp,
+                                color = Color.White.copy(alpha = 0.6f)
+                            )
+                        }
+
+                        IconButton(onClick = { showGithubAboutDialog = true }) {
+                            Icon(
+                                imageVector = Icons.Filled.Info,
+                                contentDescription = "About",
+                                tint = Color.White.copy(alpha = 0.6f),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -93,8 +141,8 @@ fun GalleryScreen(
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = onImportClick,
-                icon = { Icon(Icons.Filled.Add, contentDescription = "Import") },
-                text = { Text("导入角色卡") },
+                icon = { Icon(Icons.Filled.Add, contentDescription = "Batch Import") },
+                text = { Text("批量导入") },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = Color.White
             )
@@ -145,24 +193,27 @@ fun GalleryScreen(
             }
         }
 
-        // Import Category Selection Modal
-        pendingImportUri?.let { uri ->
-            ImportCategorySelectDialog(
-                uri = uri,
-                onConfirm = { selectedTags -> onImportConfirmed(uri, selectedTags) },
+        // Batch Import Category Selection Modal (Using existing dynamic user tags)
+        if (pendingImportUris.isNotEmpty()) {
+            BatchImportCategorySelectDialog(
+                count = pendingImportUris.size,
+                existingTags = existingTags,
+                onConfirm = { selectedTags -> onImportConfirmed(pendingImportUris, selectedTags) },
                 onDismiss = onImportCancelled
             )
+        }
+
+        // GitHub About Modal
+        if (showGithubAboutDialog) {
+            GithubAboutDialog(onDismiss = { showGithubAboutDialog = false })
         }
 
         // Detail Dialog Modal
         selectedCardForDetail?.let { card ->
             CardDetailDialog(
                 card = card,
+                existingTags = existingTags,
                 onDismiss = { selectedCardForDetail = null },
-                onFavoriteToggle = {
-                    viewModel.toggleFavorite(card)
-                    selectedCardForDetail = card.copy(isFavorite = !card.isFavorite)
-                },
                 onUpdateTags = { newTags ->
                     viewModel.updateCardTags(card.id, newTags)
                 },
@@ -177,21 +228,21 @@ fun GalleryScreen(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ImportCategorySelectDialog(
-    uri: Uri,
+fun BatchImportCategorySelectDialog(
+    count: Int,
+    existingTags: List<String>,
     onConfirm: (List<String>) -> Unit,
     onDismiss: () -> Unit
 ) {
     val tagList = remember { mutableStateListOf<String>() }
     var customTagInput by remember { mutableStateOf("") }
-    val presetCategories = listOf("赛博朋克", "奇幻魔法", "日常恋爱", "助手工具", "原神", "二次元", "特例系")
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("选择导入分类", fontSize = 18.sp, fontWeight = FontWeight.Bold) },
+        title = { Text("批量导入角色卡 ($count 张)", fontSize = 18.sp, fontWeight = FontWeight.Bold) },
         text = {
             Column {
-                Text("即将导入角色卡，请选择其归属的分类货架：", fontSize = 13.sp, color = Color.Gray)
+                Text("即将进行合规检查并导入 $count 张角色卡，请选择或新建归属的分类货架：", fontSize = 13.sp, color = Color.Gray)
                 Spacer(modifier = Modifier.height(10.dp))
 
                 // Custom Tag Input Row
@@ -199,7 +250,7 @@ fun ImportCategorySelectDialog(
                     OutlinedTextField(
                         value = customTagInput,
                         onValueChange = { customTagInput = it },
-                        placeholder = { Text("输入分类标签...", fontSize = 12.sp) },
+                        placeholder = { Text("新建分类名称...", fontSize = 12.sp) },
                         singleLine = true,
                         modifier = Modifier.weight(1f)
                     )
@@ -218,44 +269,98 @@ fun ImportCategorySelectDialog(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Text("快捷勾选预设分类：", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(6.dp))
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    presetCategories.forEach { preset ->
-                        val isSelected = tagList.contains(preset)
-                        AssistChip(
-                            onClick = {
-                                if (isSelected) tagList.remove(preset) else tagList.add(preset)
-                            },
-                            label = { Text((if (isSelected) "✓ " else "+ ") + preset, fontSize = 11.sp) },
-                            colors = AssistChipDefaults.assistChipColors(
-                                containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                                labelColor = if (isSelected) Color.White else Color.White.copy(alpha = 0.8f)
+                // Display Existing User Categories for quick selection
+                if (existingTags.isNotEmpty()) {
+                    Text("快捷加入已有的分类：", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        existingTags.forEach { existing ->
+                            val isSelected = tagList.contains(existing)
+                            AssistChip(
+                                onClick = {
+                                    if (isSelected) tagList.remove(existing) else tagList.add(existing)
+                                },
+                                label = { Text((if (isSelected) "✓ " else "+ ") + existing, fontSize = 11.sp) },
+                                colors = AssistChipDefaults.assistChipColors(
+                                    containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                    labelColor = if (isSelected) Color.White else Color.White.copy(alpha = 0.85f)
+                                )
                             )
-                        )
+                        }
                     }
+                    Spacer(modifier = Modifier.height(10.dp))
                 }
 
                 if (tagList.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text("当前分配分类: ${tagList.joinToString(", ")}", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                    Text("当前指定分类: ${tagList.joinToString(", ")}", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
                 } else {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text("提示: 未选择时将优先保留卡片自带标签或归为'未分类'", fontSize = 11.sp, color = Color.Gray)
+                    Text("提示: 未选择时将自动提取卡片自带标签或归为'未分类'", fontSize = 11.sp, color = Color.Gray)
                 }
             }
         },
         confirmButton = {
             Button(onClick = { onConfirm(tagList.toList()) }) {
-                Text("确定导入")
+                Text("开始合规检查并导入")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text("取消")
+            }
+        }
+    )
+}
+
+@Composable
+fun GithubAboutDialog(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.Code, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("关于 CharaVault", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column {
+                Text("CharaVault 🎴 是一款轻量、精致且高颜值的个人角色卡本地珍藏馆应用。", fontSize = 13.sp, color = Color.White.copy(alpha = 0.85f))
+                Spacer(modifier = Modifier.height(12.dp))
+                Text("开发者 GitHub 徽章：", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
+                        .clickable {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Future-404/CharaVault"))
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "https://github.com/Future-404/CharaVault", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                        .padding(12.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Code, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text("Future-404 / CharaVault", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text("点击访问 GitHub 仓库源码", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onDismiss) {
+                Text("关闭")
             }
         }
     )
@@ -286,7 +391,7 @@ fun EmptyStateView(onImportClick: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "点击右下角按钮导入你的第一张 PNG/V3 角色卡吧！",
+                text = "点击右下角按钮多选批量导入你的 PNG/V3 角色卡吧！",
                 fontSize = 13.sp,
                 color = Color.White.copy(alpha = 0.6f)
             )

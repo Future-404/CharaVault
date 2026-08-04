@@ -3,6 +3,8 @@ package com.charavault.app.ui.screens
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
@@ -29,19 +31,17 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -74,7 +74,6 @@ import com.charavault.app.data.local.CardEntity
 import com.charavault.app.data.model.CharacterCardV3
 import com.charavault.app.ui.components.AccordionSection
 import com.charavault.app.ui.components.LorebookEntryItem
-import com.charavault.app.ui.theme.GoldStar
 import kotlinx.serialization.json.Json
 import java.io.File
 
@@ -82,8 +81,8 @@ import java.io.File
 @Composable
 fun CardDetailDialog(
     card: CardEntity,
+    existingTags: List<String>,
     onDismiss: () -> Unit,
-    onFavoriteToggle: () -> Unit,
     onUpdateTags: (List<String>) -> Unit,
     onDelete: () -> Unit
 ) {
@@ -144,7 +143,7 @@ fun CardDetailDialog(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Name, Creator & Favorite Button
+                    // Name & Creator
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -161,15 +160,6 @@ fun CardDetailDialog(
                                 text = "作者: @${card.creator.ifBlank { "匿名" }}",
                                 fontSize = 13.sp,
                                 color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-
-                        IconButton(onClick = onFavoriteToggle) {
-                            Icon(
-                                imageVector = if (card.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                                contentDescription = "Favorite",
-                                tint = if (card.isFavorite) GoldStar else Color.Gray,
-                                modifier = Modifier.size(30.dp)
                             )
                         }
                     }
@@ -362,6 +352,32 @@ fun CardDetailDialog(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("删除角色卡")
                     }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Subtle GitHub Badge at bottom
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                try {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Future-404/CharaVault"))
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "https://github.com/Future-404/CharaVault", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Filled.Code, contentDescription = "GitHub", tint = Color.White.copy(alpha = 0.4f), modifier = Modifier.size(12.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Future-404 / CharaVault",
+                            fontSize = 11.sp,
+                            color = Color.White.copy(alpha = 0.4f)
+                        )
+                    }
                 }
 
                 // Top Right Close Button
@@ -378,10 +394,11 @@ fun CardDetailDialog(
         }
     }
 
-    // Category Edit Dialog
+    // Category Edit Dialog (Uses dynamic user existing tags for quick toggle)
     if (showCategoryEditDialog) {
         CategoryEditDialog(
             currentTags = tags,
+            existingTags = existingTags,
             onDismiss = { showCategoryEditDialog = false },
             onSave = { newTags ->
                 onUpdateTags(newTags)
@@ -395,20 +412,19 @@ fun CardDetailDialog(
 @Composable
 fun CategoryEditDialog(
     currentTags: List<String>,
+    existingTags: List<String>,
     onDismiss: () -> Unit,
     onSave: (List<String>) -> Unit
 ) {
     val tagList = remember { mutableStateListOf<String>().apply { addAll(currentTags.filter { it != "未分类" }) } }
     var newTagInput by remember { mutableStateOf("") }
 
-    val presetCategories = listOf("赛博朋克", "奇幻魔法", "日常恋爱", "助手工具", "原神", "二次元", "特例系")
-
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("编辑角色卡分类标签", fontSize = 18.sp, fontWeight = FontWeight.Bold) },
         text = {
             Column {
-                Text("输入自定义分类或添加预设标签：", fontSize = 13.sp, color = Color.Gray)
+                Text("输入自定义分类名称，或快捷勾选已有的分类：", fontSize = 13.sp, color = Color.Gray)
                 Spacer(modifier = Modifier.height(10.dp))
 
                 // Custom Input Box
@@ -416,7 +432,7 @@ fun CategoryEditDialog(
                     OutlinedTextField(
                         value = newTagInput,
                         onValueChange = { newTagInput = it },
-                        placeholder = { Text("新分类标签...", fontSize = 12.sp) },
+                        placeholder = { Text("输入新分类名称...", fontSize = 12.sp) },
                         singleLine = true,
                         modifier = Modifier.weight(1f)
                     )
@@ -438,41 +454,48 @@ fun CategoryEditDialog(
                 // Current Selected Tags
                 Text("已选分类：", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(4.dp))
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    tagList.forEach { tag ->
-                        AssistChip(
-                            onClick = { tagList.remove(tag) },
-                            label = { Text("$tag ✕", fontSize = 12.sp) },
-                            colors = AssistChipDefaults.assistChipColors(
-                                containerColor = MaterialTheme.colorScheme.primary
+                if (tagList.isEmpty()) {
+                    Text("暂未选择分类（保存后将归为'未分类'）", fontSize = 11.sp, color = Color.Gray)
+                } else {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        tagList.forEach { tag ->
+                            AssistChip(
+                                onClick = { tagList.remove(tag) },
+                                label = { Text("$tag ✕", fontSize = 12.sp) },
+                                colors = AssistChipDefaults.assistChipColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    labelColor = Color.White
+                                )
                             )
-                        )
+                        }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Preset Categories Quick Add
-                Text("快捷预设分类：", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(4.dp))
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    presetCategories.forEach { preset ->
-                        val isSelected = tagList.contains(preset)
-                        AssistChip(
-                            onClick = {
-                                if (isSelected) tagList.remove(preset) else tagList.add(preset)
-                            },
-                            label = { Text((if (isSelected) "✓ " else "+ ") + preset, fontSize = 11.sp) },
-                            colors = AssistChipDefaults.assistChipColors(
-                                containerColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surfaceVariant
+                // Dynamic Existing User Categories (Quick Add Chips)
+                if (existingTags.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Text("快捷加入已有的分类：", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        existingTags.forEach { existing ->
+                            val isSelected = tagList.contains(existing)
+                            AssistChip(
+                                onClick = {
+                                    if (isSelected) tagList.remove(existing) else tagList.add(existing)
+                                },
+                                label = { Text((if (isSelected) "✓ " else "+ ") + existing, fontSize = 11.sp) },
+                                colors = AssistChipDefaults.assistChipColors(
+                                    containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                    labelColor = if (isSelected) Color.White else Color.White.copy(alpha = 0.85f)
+                                )
                             )
-                        )
+                        }
                     }
                 }
             }
@@ -488,117 +511,4 @@ fun CategoryEditDialog(
             }
         }
     )
-}
-
-@Composable
-fun GreetingCardItem(label: String, content: String) {
-    val context = LocalContext.current
-    var isExpanded by remember { mutableStateOf(content.length < 300) }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.5f)),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = label,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                IconButton(
-                    onClick = {
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText(label, content))
-                        Toast.makeText(context, "已复制 $label 到剪贴板", Toast.LENGTH_SHORT).show()
-                    },
-                    modifier = Modifier.size(28.dp)
-                ) {
-                    Icon(
-                        Icons.Filled.ContentCopy,
-                        contentDescription = "Copy",
-                        tint = Color.White.copy(alpha = 0.7f),
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            val displayText = if (isExpanded || content.length < 300) content else content.take(300) + "..."
-            Text(
-                text = displayText,
-                fontSize = 13.sp,
-                color = Color.White.copy(alpha = 0.85f),
-                lineHeight = 19.sp
-            )
-
-            if (content.length >= 300) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = if (isExpanded) "▲ 收起全文" else "▼ 展开全文 (共 ${content.length} 字)",
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .clickable { isExpanded = !isExpanded }
-                        .padding(vertical = 2.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun SubTitleText(title: String) {
-    Text(
-        text = title,
-        fontSize = 13.sp,
-        fontWeight = FontWeight.Bold,
-        color = Color.White.copy(alpha = 0.7f),
-        modifier = Modifier.padding(bottom = 4.dp)
-    )
-}
-
-@Composable
-fun ExpandableContentBox(text: String) {
-    var isExpanded by remember { mutableStateOf(text.length < 500) }
-    val displayText = if (isExpanded || text.length < 500) text else text.take(500) + "..."
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
-            .padding(12.dp)
-    ) {
-        Column {
-            Text(
-                text = displayText,
-                fontSize = 13.sp,
-                color = Color.White.copy(alpha = 0.85f),
-                lineHeight = 19.sp
-            )
-            if (text.length >= 500) {
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = if (isExpanded) "▲ 收起全文" else "▼ 展开全文 (共 ${text.length} 字)",
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .clickable { isExpanded = !isExpanded }
-                        .padding(vertical = 2.dp)
-                )
-            }
-        }
-    }
 }

@@ -2,6 +2,7 @@ package com.charavault.app
 
 import android.net.Uri
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -16,12 +17,15 @@ import com.charavault.app.ui.viewmodel.MainViewModel
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
-    private var pendingImportUri by mutableStateOf<Uri?>(null)
+    private var pendingImportUris by mutableStateOf<List<Uri>>(emptyList())
 
-    private val filePickerLauncher = registerForActivityResult(
-        ActivityResultContracts.GetContent()
-    ) { uri ->
-        uri?.let { pendingImportUri = it }
+    // ActivityResultLauncher for selecting multiple PNG files at once
+    private val batchFilePickerLauncher = registerForActivityResult(
+        ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            pendingImportUris = uris
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,16 +35,23 @@ class MainActivity : ComponentActivity() {
             CharaVaultTheme {
                 GalleryScreen(
                     viewModel = viewModel,
-                    pendingImportUri = pendingImportUri,
+                    pendingImportUris = pendingImportUris,
                     onImportClick = {
-                        filePickerLauncher.launch("image/png")
+                        batchFilePickerLauncher.launch("image/png")
                     },
-                    onImportConfirmed = { uri, selectedTags ->
-                        viewModel.importCardUri(uri, selectedTags)
-                        pendingImportUri = null
+                    onImportConfirmed = { uris, selectedTags ->
+                        viewModel.importCardUrisBatch(uris, selectedTags) { result ->
+                            val msg = if (result.failedCount == 0) {
+                                "🎉 成功导入 ${result.successCount} 张合规角色卡！"
+                            } else {
+                                "✅ 成功导入 ${result.successCount} 张，⚠️ 过滤掉 ${result.failedCount} 张非合规文件"
+                            }
+                            Toast.makeText(this@MainActivity, msg, Toast.LENGTH_LONG).show()
+                        }
+                        pendingImportUris = emptyList()
                     },
                     onImportCancelled = {
-                        pendingImportUri = null
+                        pendingImportUris = emptyList()
                     }
                 )
             }

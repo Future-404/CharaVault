@@ -3,18 +3,24 @@ package com.charavault.app.data.repository
 import android.content.Context
 import com.charavault.app.data.local.AppDatabase
 import com.charavault.app.data.local.CardEntity
-import com.charavault.app.data.model.CardData
 import com.charavault.app.data.model.CharacterCardV3
+import com.charavault.app.data.parser.CardValidator
 import com.charavault.app.data.parser.PngChunkUtils
+import com.charavault.app.data.parser.ValidationResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.InputStream
 import java.util.UUID
+
+data class BatchImportResult(
+    val successCount: Int,
+    val failedCount: Int,
+    val failedReasons: List<String>
+)
 
 class CardRepository(private val context: Context) {
 
@@ -28,59 +34,71 @@ class CardRepository(private val context: Context) {
 
     fun getAllCards(): Flow<List<CardEntity>> = cardDao.getAllCardsFlow()
 
-    suspend fun importCardStream(
-        inputStream: InputStream,
-        originalFileName: String?,
+    /**
+     * Batch import multiple cards with strict compliance validation
+     */
+    suspend fun importCardStreamsBatch(
+        items: List<Pair<InputStream, String>>,
         selectedTags: List<String> = emptyList()
-    ): Boolean = withContext(Dispatchers.IO) {
-        try {
-            val bytes = inputStream.readBytes()
-            val cardV3 = PngChunkUtils.extractCardFromJsonPng(ByteArrayInputStream(bytes))
-                ?: createDefaultCardV3(originalFileName ?: "新角色卡")
+    ): BatchImportResult = withContext(Dispatchers.IO) {
+        var successCount = 0
+        var failedCount = 0
+        val failedReasons = mutableListOf<String>()
 
-            val id = UUID.randomUUID().toString().take(8)
-            val destFile = File(cardsDir, "chara_$id.png")
+        items.forEach { (inputStream, fileName) ->
+            try {
+                val bytes = inputStream.readBytes()
+                when (val validation = CardValidator.validatePngCard(bytes, fileName)) {
+                    is ValidationResult.Success -> {
+                        val cardV3 = validation.cardV3
+                        val id = UUID.randomUUID().toString().take(8)
+                        val destFile = File(cardsDir, "chara_$id.png")
 
-            // Determine effective tags
-            val finalTags = if (selectedTags.isNotEmpty()) {
-                selectedTags
-            } else if (cardV3.data.tags.isNotEmpty()) {
-                cardV3.data.tags
-            } else {
-                listOf("未分类")
+                        val finalTags = if (selectedTags.isNotEmpty()) {
+                            selectedTags
+                        } else if (cardV3.data.tags.isNotEmpty()) {
+                            cardV3.data.tags
+                        } else {
+                            listOf("未分类")
+                        }
+
+                        val updatedV3 = cardV3.copy(data = cardV3.data.copy(tags = finalTags))
+                        val jsonStr = json.encodeToString(updatedV3)
+
+                        val finalPngBytes = PngChunkUtils.injectJsonIntoPng(bytes, jsonStr)
+                        destFile.writeBytes(finalPngBytes)
+
+                        val entity = CardEntity(
+                            id = id,
+                            name = updatedV3.data.name,
+                            creator = updatedV3.data.creator.ifBlank { "未知作者" },
+                            description = updatedV3.data.description,
+                            personality = updatedV3.data.personality,
+                            scenario = updatedV3.data.scenario,
+                            firstMes = updatedV3.data.firstMes,
+                            systemPrompt = updatedV3.data.systemPrompt,
+                            tagsJson = json.encodeToString(finalTags),
+                            alternateGreetingsJson = json.encodeToString(updatedV3.data.alternateGreetings),
+                            rawJsonData = jsonStr,
+                            imagePath = destFile.absolutePath,
+                            isFavorite = false
+                        )
+
+                        cardDao.insertCard(entity)
+                        successCount++
+                    }
+                    is ValidationResult.Invalid -> {
+                        failedCount++
+                        failedReasons.add("$fileName: ${validation.reason}")
+                    }
+                }
+            } catch (e: Exception) {
+                failedCount++
+                failedReasons.add("$fileName: 读取文件失败")
             }
-
-            val updatedV3 = cardV3.copy(data = cardV3.data.copy(tags = finalTags))
-            val jsonStr = json.encodeToString(updatedV3)
-
-            val finalPngBytes = PngChunkUtils.injectJsonIntoPng(bytes, jsonStr)
-            destFile.writeBytes(finalPngBytes)
-
-            val name = updatedV3.data.name.ifBlank { originalFileName?.substringBeforeLast(".") ?: "未命名角色" }
-            val creator = updatedV3.data.creator.ifBlank { "未知作者" }
-
-            val entity = CardEntity(
-                id = id,
-                name = name,
-                creator = creator,
-                description = updatedV3.data.description,
-                personality = updatedV3.data.personality,
-                scenario = updatedV3.data.scenario,
-                firstMes = updatedV3.data.firstMes,
-                systemPrompt = updatedV3.data.systemPrompt,
-                tagsJson = json.encodeToString(finalTags),
-                alternateGreetingsJson = json.encodeToString(updatedV3.data.alternateGreetings),
-                rawJsonData = jsonStr,
-                imagePath = destFile.absolutePath,
-                isFavorite = false
-            )
-
-            cardDao.insertCard(entity)
-            true
-        } catch (e: Exception) {
-            e.printStackTrace()
-            false
         }
+
+        BatchImportResult(successCount, failedCount, failedReasons)
     }
 
     suspend fun updateCardTags(id: String, newTags: List<String>) = withContext(Dispatchers.IO) {
@@ -123,15 +141,5 @@ class CardRepository(private val context: Context) {
             e.printStackTrace()
         }
         cardDao.deleteCard(card)
-    }
-
-    private fun createDefaultCardV3(name: String): CharacterCardV3 {
-        return CharacterCardV3(
-            data = CardData(
-                name = name,
-                description = "导入的角色卡详细信息...",
-                tags = listOf("默认")
-            )
-        )
     }
 }

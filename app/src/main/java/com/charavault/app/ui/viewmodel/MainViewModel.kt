@@ -5,18 +5,19 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.charavault.app.data.local.CardEntity
+import com.charavault.app.data.repository.BatchImportResult
 import com.charavault.app.data.repository.CardRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
 data class CardGroup(
     val title: String,
-    val isFavoriteGroup: Boolean = false,
     val cards: List<CardEntity>
 )
 
@@ -31,7 +32,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val allCards: StateFlow<List<CardEntity>> = repository.getAllCards()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    // Grouped Cards: Favorite group + Category tag groups
+    // Dynamically extract all existing tags from current database cards (excluding '未分类')
+    val existingTags: StateFlow<List<String>> = allCards.map { cards ->
+        cards.flatMap { card ->
+            try { json.decodeFromString<List<String>>(card.tagsJson) } catch (e: Exception) { emptyList() }
+        }.filter { it.isNotBlank() && it != "未分类" }.distinct().sorted()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Pure Category Tag Grouped Cards
     val groupedCards: StateFlow<List<CardGroup>> = combine(allCards, searchQuery, selectedTagFilter) { cards, query, tagFilter ->
         val filtered = cards.filter { card ->
             val matchesQuery = query.isBlank() || 
@@ -47,13 +55,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         val resultGroups = mutableListOf<CardGroup>()
 
-        // 1. Favorites Group (if any)
-        val favorites = filtered.filter { it.isFavorite }
-        if (favorites.isNotEmpty()) {
-            resultGroups.add(CardGroup(title = "⭐ 常用收藏", isFavoriteGroup = true, cards = favorites))
-        }
-
-        // 2. Tag Groups
+        // Category Tag Groups Only
         val tagMap = mutableMapOf<String, MutableList<CardEntity>>()
         filtered.forEach { card ->
             val tags = try { json.decodeFromString<List<String>>(card.tagsJson) } catch (e: Exception) { listOf("未分类") }
@@ -64,30 +66,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         tagMap.forEach { (tag, list) ->
-            resultGroups.add(CardGroup(title = "🏷️ $tag", isFavoriteGroup = false, cards = list))
+            resultGroups.add(CardGroup(title = "🏷️ $tag", cards = list))
         }
 
         resultGroups
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun importCardUri(uri: Uri, selectedTags: List<String> = emptyList()) {
+    fun importCardUrisBatch(uris: List<Uri>, selectedTags: List<String>, onResult: (BatchImportResult) -> Unit) {
         viewModelScope.launch {
             val contentResolver = getApplication<Application>().contentResolver
-            val inputStream = contentResolver.openInputStream(uri) ?: return@launch
-            val fileName = uri.lastPathSegment
-            repository.importCardStream(inputStream, fileName, selectedTags)
+            val items = uris.mapNotNull { uri ->
+                val stream = contentResolver.openInputStream(uri) ?: return@mapNotNull null
+                val fileName = uri.lastPathSegment ?: "character.png"
+                Pair(stream, fileName)
+            }
+            val result = repository.importCardStreamsBatch(items, selectedTags)
+            onResult(result)
         }
     }
 
     fun updateCardTags(cardId: String, newTags: List<String>) {
         viewModelScope.launch {
             repository.updateCardTags(cardId, newTags)
-        }
-    }
-
-    fun toggleFavorite(card: CardEntity) {
-        viewModelScope.launch {
-            repository.toggleFavorite(card.id, !card.isFavorite)
         }
     }
 
