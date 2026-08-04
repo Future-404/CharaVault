@@ -489,3 +489,116 @@ fun CategoryEditDialog(
         }
     )
 }
+
+@Composable
+fun GreetingCardItem(label: String, content: String) {
+    val context = LocalContext.current
+    var isExpanded by remember { mutableStateOf(content.length < 300) }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.5f)),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = label,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                IconButton(
+                    onClick = {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText(label, content))
+                        Toast.makeText(context, "已复制 $label 到剪贴板", Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        Icons.Filled.ContentCopy,
+                        contentDescription = "Copy",
+                        tint = Color.White.copy(alpha = 0.7f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            val displayText = if (isExpanded || content.length < 300) content else content.take(300) + "..."
+            Text(
+                text = displayText,
+                fontSize = 13.sp,
+                color = Color.White.copy(alpha = 0.85f),
+                lineHeight = 19.sp
+            )
+
+            if (content.length >= 300) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = if (isExpanded) "▲ 收起全文" else "▼ 展开全文 (共 ${content.length} 字)",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .clickable { isExpanded = !isExpanded }
+                        .padding(vertical = 2.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun SubTitleText(title: String) {
+    Text(
+        text = title,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.Bold,
+        color = Color.White.copy(alpha = 0.7f),
+        modifier = Modifier.padding(bottom = 4.dp)
+    )
+}
+
+@Composable
+fun ExpandableContentBox(text: String) {
+    var isExpanded by remember { mutableStateOf(text.length < 500) }
+    val displayText = if (isExpanded || text.length < 500) text else text.take(500) + "..."
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
+            .padding(12.dp)
+    ) {
+        Column {
+            Text(
+                text = displayText,
+                fontSize = 13.sp,
+                color = Color.White.copy(alpha = 0.85f),
+                lineHeight = 19.sp
+            )
+            if (text.length >= 500) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = if (isExpanded) "▲ 收起全文" else "▼ 展开全文 (共 ${text.length} 字)",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .clickable { isExpanded = !isExpanded }
+                        .padding(vertical = 2.dp)
+                )
+            }
+        }
+    }
+}
