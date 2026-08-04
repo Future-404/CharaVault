@@ -26,7 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Collections
-import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.FolderZip
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -69,9 +69,10 @@ fun GalleryScreen(
     pendingImportUris: List<Uri>,
     onImportClick: () -> Unit,
     onImportConfirmed: (List<Uri>, List<String>) -> Unit,
-    onImportCancelled: () -> Unit
+    onImportCancelled: () -> Unit,
+    onExportSingleCardClick: (CardEntity) -> Unit,
+    onExportAllZipClick: () -> Unit
 ) {
-    val context = LocalContext.current
     val groupedCards by viewModel.groupedCards.collectAsState()
     val existingTags by viewModel.existingTags.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -82,55 +83,39 @@ fun GalleryScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "CharaVault 🎴",
-                                    fontSize = 20.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                // Subtle GitHub Badge Button in TopBar
-                                Box(
-                                    modifier = Modifier
-                                        .background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
-                                        .clickable { showGithubAboutDialog = true }
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Filled.Code,
-                                            contentDescription = "GitHub Badge",
-                                            tint = Color.White.copy(alpha = 0.7f),
-                                            modifier = Modifier.size(12.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(3.dp))
-                                        Text(
-                                            text = "Future-404",
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = Color.White.copy(alpha = 0.7f)
-                                        )
-                                    }
-                                }
-                            }
-                            Text(
-                                text = "个人角色卡珍藏馆",
-                                fontSize = 11.sp,
-                                color = Color.White.copy(alpha = 0.6f)
-                            )
-                        }
+                    Column {
+                        Text(
+                            text = "CharaVault 🎴",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Text(
+                            text = "个人角色卡珍藏馆",
+                            fontSize = 11.sp,
+                            color = Color.White.copy(alpha = 0.6f)
+                        )
+                    }
+                },
+                actions = {
+                    // Export All Zip Backup Action Button
+                    IconButton(onClick = onExportAllZipClick) {
+                        Icon(
+                            imageVector = Icons.Filled.FolderZip,
+                            contentDescription = "Export All Zip",
+                            tint = Color.White.copy(alpha = 0.85f),
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
 
-                        IconButton(onClick = { showGithubAboutDialog = true }) {
-                            Icon(
-                                imageVector = Icons.Filled.Info,
-                                contentDescription = "About",
-                                tint = Color.White.copy(alpha = 0.6f),
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
+                    // GitHub Top Right Icon Button
+                    IconButton(onClick = { showGithubAboutDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Filled.Code,
+                            contentDescription = "GitHub Repository",
+                            tint = Color.White.copy(alpha = 0.85f),
+                            modifier = Modifier.size(22.dp)
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -186,14 +171,15 @@ fun GalleryScreen(
                     items(groupedCards, key = { it.title }) { group ->
                         CategoryRow(
                             group = group,
-                            onCardClick = { card -> selectedCardForDetail = card }
+                            onCardClick = { card -> selectedCardForDetail = card },
+                            onReorderCards = { reorderedIds -> viewModel.reorderCards(reorderedIds) }
                         )
                     }
                 }
             }
         }
 
-        // Batch Import Category Selection Modal (Using existing dynamic user tags)
+        // Batch Import Category Selection Modal
         if (pendingImportUris.isNotEmpty()) {
             BatchImportCategorySelectDialog(
                 count = pendingImportUris.size,
@@ -214,6 +200,9 @@ fun GalleryScreen(
                 card = card,
                 existingTags = existingTags,
                 onDismiss = { selectedCardForDetail = null },
+                onExportSingleCard = {
+                    onExportSingleCardClick(card)
+                },
                 onUpdateTags = { newTags ->
                     viewModel.updateCardTags(card.id, newTags)
                 },
@@ -321,7 +310,7 @@ fun GithubAboutDialog(onDismiss: () -> Unit) {
         onDismissRequest = onDismiss,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.Code, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Icon(Icons.Filled.Code, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("关于 CharaVault", fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }

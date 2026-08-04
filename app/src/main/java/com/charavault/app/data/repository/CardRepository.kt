@@ -19,6 +19,7 @@ import java.util.UUID
 data class BatchImportResult(
     val successCount: Int,
     val failedCount: Int,
+    val duplicateCount: Int,
     val failedReasons: List<String>
 )
 
@@ -35,7 +36,16 @@ class CardRepository(private val context: Context) {
     fun getAllCards(): Flow<List<CardEntity>> = cardDao.getAllCardsFlow()
 
     /**
-     * Batch import multiple cards with strict compliance validation
+     * Update card sort order persistence
+     */
+    suspend fun updateCardsOrder(cardIdsInOrder: List<String>) = withContext(Dispatchers.IO) {
+        cardIdsInOrder.forEachIndexed { index, id ->
+            cardDao.updateSortOrder(id, index)
+        }
+    }
+
+    /**
+     * Batch import multiple cards with compliance validation & dual-layer hash de-duplication
      */
     suspend fun importCardStreamsBatch(
         items: List<Pair<InputStream, String>>,
@@ -43,6 +53,7 @@ class CardRepository(private val context: Context) {
     ): BatchImportResult = withContext(Dispatchers.IO) {
         var successCount = 0
         var failedCount = 0
+        var duplicateCount = 0
         val failedReasons = mutableListOf<String>()
 
         items.forEach { (inputStream, fileName) ->
@@ -51,6 +62,21 @@ class CardRepository(private val context: Context) {
                 when (val validation = CardValidator.validatePngCard(bytes, fileName)) {
                     is ValidationResult.Success -> {
                         val cardV3 = validation.cardV3
+                        val fileHash = validation.fileHash
+                        val semanticHash = validation.semanticHash
+
+                        // 1. Dual-layer Hash Deduplication Check
+                        val existingByFileHash = cardDao.getCardByFileHash(fileHash)
+                        val existingBySemanticHash = cardDao.getCardBySemanticHash(semanticHash)
+
+                        if (existingByFileHash != null || existingBySemanticHash != null) {
+                            duplicateCount++
+                            val existingName = existingByFileHash?.name ?: existingBySemanticHash?.name ?: cardV3.data.name
+                            failedReasons.add("重复卡片: [$existingName]")
+                            return@forEach
+                        }
+
+                        // 2. Insert New Card
                         val id = UUID.randomUUID().toString().take(8)
                         val destFile = File(cardsDir, "chara_$id.png")
 
@@ -81,6 +107,8 @@ class CardRepository(private val context: Context) {
                             alternateGreetingsJson = json.encodeToString(updatedV3.data.alternateGreetings),
                             rawJsonData = jsonStr,
                             imagePath = destFile.absolutePath,
+                            fileHash = fileHash,
+                            semanticHash = semanticHash,
                             isFavorite = false
                         )
 
@@ -98,7 +126,7 @@ class CardRepository(private val context: Context) {
             }
         }
 
-        BatchImportResult(successCount, failedCount, failedReasons)
+        BatchImportResult(successCount, failedCount, duplicateCount, failedReasons)
     }
 
     suspend fun updateCardTags(id: String, newTags: List<String>) = withContext(Dispatchers.IO) {
@@ -127,10 +155,6 @@ class CardRepository(private val context: Context) {
             updatedAt = System.currentTimeMillis()
         )
         cardDao.updateCard(updatedEntity)
-    }
-
-    suspend fun toggleFavorite(id: String, isFavorite: Boolean) = withContext(Dispatchers.IO) {
-        cardDao.setFavorite(id, isFavorite)
     }
 
     suspend fun deleteCard(card: CardEntity) = withContext(Dispatchers.IO) {

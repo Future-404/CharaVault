@@ -16,6 +16,7 @@ import java.lang.Override;
 import java.lang.String;
 import java.lang.SuppressWarnings;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -31,12 +32,14 @@ public final class AppDatabase_Impl extends AppDatabase {
   @Override
   @NonNull
   protected SupportSQLiteOpenHelper createOpenHelper(@NonNull final DatabaseConfiguration config) {
-    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(1) {
+    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(2) {
       @Override
       public void createAllTables(@NonNull final SupportSQLiteDatabase db) {
-        db.execSQL("CREATE TABLE IF NOT EXISTS `cards` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `creator` TEXT NOT NULL, `description` TEXT NOT NULL, `personality` TEXT NOT NULL, `scenario` TEXT NOT NULL, `firstMes` TEXT NOT NULL, `systemPrompt` TEXT NOT NULL, `tagsJson` TEXT NOT NULL, `alternateGreetingsJson` TEXT NOT NULL, `rawJsonData` TEXT NOT NULL, `imagePath` TEXT NOT NULL, `isFavorite` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))");
+        db.execSQL("CREATE TABLE IF NOT EXISTS `cards` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `creator` TEXT NOT NULL, `description` TEXT NOT NULL, `personality` TEXT NOT NULL, `scenario` TEXT NOT NULL, `firstMes` TEXT NOT NULL, `systemPrompt` TEXT NOT NULL, `tagsJson` TEXT NOT NULL, `alternateGreetingsJson` TEXT NOT NULL, `rawJsonData` TEXT NOT NULL, `imagePath` TEXT NOT NULL, `fileHash` TEXT NOT NULL, `semanticHash` TEXT NOT NULL, `sortOrder` INTEGER NOT NULL, `isFavorite` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))");
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_cards_fileHash` ON `cards` (`fileHash`)");
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_cards_semanticHash` ON `cards` (`semanticHash`)");
         db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)");
-        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e38f672649c44cb023320bff5e37b489')");
+        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'ad606d343f78243abd220d8b9c9f2212')");
       }
 
       @Override
@@ -85,7 +88,7 @@ public final class AppDatabase_Impl extends AppDatabase {
       @NonNull
       public RoomOpenHelper.ValidationResult onValidateSchema(
           @NonNull final SupportSQLiteDatabase db) {
-        final HashMap<String, TableInfo.Column> _columnsCards = new HashMap<String, TableInfo.Column>(15);
+        final HashMap<String, TableInfo.Column> _columnsCards = new HashMap<String, TableInfo.Column>(18);
         _columnsCards.put("id", new TableInfo.Column("id", "TEXT", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsCards.put("name", new TableInfo.Column("name", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsCards.put("creator", new TableInfo.Column("creator", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
@@ -98,11 +101,16 @@ public final class AppDatabase_Impl extends AppDatabase {
         _columnsCards.put("alternateGreetingsJson", new TableInfo.Column("alternateGreetingsJson", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsCards.put("rawJsonData", new TableInfo.Column("rawJsonData", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsCards.put("imagePath", new TableInfo.Column("imagePath", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsCards.put("fileHash", new TableInfo.Column("fileHash", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsCards.put("semanticHash", new TableInfo.Column("semanticHash", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsCards.put("sortOrder", new TableInfo.Column("sortOrder", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsCards.put("isFavorite", new TableInfo.Column("isFavorite", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsCards.put("createdAt", new TableInfo.Column("createdAt", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsCards.put("updatedAt", new TableInfo.Column("updatedAt", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         final HashSet<TableInfo.ForeignKey> _foreignKeysCards = new HashSet<TableInfo.ForeignKey>(0);
-        final HashSet<TableInfo.Index> _indicesCards = new HashSet<TableInfo.Index>(0);
+        final HashSet<TableInfo.Index> _indicesCards = new HashSet<TableInfo.Index>(2);
+        _indicesCards.add(new TableInfo.Index("index_cards_fileHash", false, Arrays.asList("fileHash"), Arrays.asList("ASC")));
+        _indicesCards.add(new TableInfo.Index("index_cards_semanticHash", false, Arrays.asList("semanticHash"), Arrays.asList("ASC")));
         final TableInfo _infoCards = new TableInfo("cards", _columnsCards, _foreignKeysCards, _indicesCards);
         final TableInfo _existingCards = TableInfo.read(db, "cards");
         if (!_infoCards.equals(_existingCards)) {
@@ -112,7 +120,7 @@ public final class AppDatabase_Impl extends AppDatabase {
         }
         return new RoomOpenHelper.ValidationResult(true, null);
       }
-    }, "e38f672649c44cb023320bff5e37b489", "f553c0ed6b5adeea6b9e125bccc202d9");
+    }, "ad606d343f78243abd220d8b9c9f2212", "9bc4b622acdf39c3d77afd9ac282baca");
     final SupportSQLiteOpenHelper.Configuration _sqliteConfig = SupportSQLiteOpenHelper.Configuration.builder(config.context).name(config.name).callback(_openCallback).build();
     final SupportSQLiteOpenHelper _helper = config.sqliteOpenHelperFactory.create(_sqliteConfig);
     return _helper;

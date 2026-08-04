@@ -39,7 +39,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }.filter { it.isNotBlank() && it != "未分类" }.distinct().sorted()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Pure Category Tag Grouped Cards
+    // Pure Category Tag Grouped Cards (Clean title without 🏷️ emoji)
     val groupedCards: StateFlow<List<CardGroup>> = combine(allCards, searchQuery, selectedTagFilter) { cards, query, tagFilter ->
         val filtered = cards.filter { card ->
             val matchesQuery = query.isBlank() || 
@@ -55,7 +55,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         val resultGroups = mutableListOf<CardGroup>()
 
-        // Category Tag Groups Only
+        // Clean Tag Groups Only
         val tagMap = mutableMapOf<String, MutableList<CardEntity>>()
         filtered.forEach { card ->
             val tags = try { json.decodeFromString<List<String>>(card.tagsJson) } catch (e: Exception) { listOf("未分类") }
@@ -66,11 +66,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         tagMap.forEach { (tag, list) ->
-            resultGroups.add(CardGroup(title = "🏷️ $tag", cards = list))
+            resultGroups.add(CardGroup(title = tag, cards = list))
         }
 
         resultGroups
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun reorderCards(cardIdsInOrder: List<String>) {
+        viewModelScope.launch {
+            repository.updateCardsOrder(cardIdsInOrder)
+        }
+    }
 
     fun importCardUrisBatch(uris: List<Uri>, selectedTags: List<String>, onResult: (BatchImportResult) -> Unit) {
         viewModelScope.launch {

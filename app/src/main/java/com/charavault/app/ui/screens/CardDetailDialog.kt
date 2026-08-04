@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -35,6 +34,7 @@ import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
@@ -42,11 +42,13 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -83,6 +85,7 @@ fun CardDetailDialog(
     card: CardEntity,
     existingTags: List<String>,
     onDismiss: () -> Unit,
+    onExportSingleCard: () -> Unit,
     onUpdateTags: (List<String>) -> Unit,
     onDelete: () -> Unit
 ) {
@@ -341,16 +344,33 @@ fun CardDetailDialog(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Delete Button
-                    Button(
-                        onClick = onDelete,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                    // Action Buttons Row: Single Export + Delete
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("删除角色卡")
+                        // Export Single Card Button
+                        OutlinedButton(
+                            onClick = onExportSingleCard,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Filled.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("导出单卡 (PNG)")
+                        }
+
+                        // Delete Card Button
+                        Button(
+                            onClick = onDelete,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("删除角色卡")
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -394,7 +414,7 @@ fun CardDetailDialog(
         }
     }
 
-    // Category Edit Dialog (Uses dynamic user existing tags for quick toggle)
+    // Category Edit Dialog
     if (showCategoryEditDialog) {
         CategoryEditDialog(
             currentTags = tags,
@@ -474,7 +494,7 @@ fun CategoryEditDialog(
                     }
                 }
 
-                // Dynamic Existing User Categories (Quick Add Chips)
+                // Dynamic Existing User Categories
                 if (existingTags.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(14.dp))
                     Text("快捷加入已有的分类：", fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -511,4 +531,117 @@ fun CategoryEditDialog(
             }
         }
     )
+}
+
+@Composable
+fun GreetingCardItem(label: String, content: String) {
+    val context = LocalContext.current
+    var isExpanded by remember { mutableStateOf(content.length < 300) }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.5f)),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = label,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                IconButton(
+                    onClick = {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText(label, content))
+                        Toast.makeText(context, "已复制 $label 到剪贴板", Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        Icons.Filled.ContentCopy,
+                        contentDescription = "Copy",
+                        tint = Color.White.copy(alpha = 0.7f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            val displayText = if (isExpanded || content.length < 300) content else content.take(300) + "..."
+            Text(
+                text = displayText,
+                fontSize = 13.sp,
+                color = Color.White.copy(alpha = 0.85f),
+                lineHeight = 19.sp
+            )
+
+            if (content.length >= 300) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = if (isExpanded) "▲ 收起全文" else "▼ 展开全文 (共 ${content.length} 字)",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .clickable { isExpanded = !isExpanded }
+                        .padding(vertical = 2.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun SubTitleText(title: String) {
+    Text(
+        text = title,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.Bold,
+        color = Color.White.copy(alpha = 0.7f),
+        modifier = Modifier.padding(bottom = 4.dp)
+    )
+}
+
+@Composable
+fun ExpandableContentBox(text: String) {
+    var isExpanded by remember { mutableStateOf(text.length < 500) }
+    val displayText = if (isExpanded || text.length < 500) text else text.take(500) + "..."
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
+            .padding(12.dp)
+    ) {
+        Column {
+            Text(
+                text = displayText,
+                fontSize = 13.sp,
+                color = Color.White.copy(alpha = 0.85f),
+                lineHeight = 19.sp
+            )
+            if (text.length >= 500) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = if (isExpanded) "▲ 收起全文" else "▼ 展开全文 (共 ${text.length} 字)",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .clickable { isExpanded = !isExpanded }
+                        .padding(vertical = 2.dp)
+                )
+            }
+        }
+    }
 }
