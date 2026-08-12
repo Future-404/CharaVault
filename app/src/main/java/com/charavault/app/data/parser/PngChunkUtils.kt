@@ -1,5 +1,6 @@
 package com.charavault.app.data.parser
 
+import android.annotation.SuppressLint
 import com.charavault.app.data.model.CharacterCardV3
 import kotlinx.serialization.json.Json
 import java.io.ByteArrayInputStream
@@ -8,7 +9,6 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
-import java.util.Base64
 import java.util.zip.CRC32
 
 object PngChunkUtils {
@@ -96,9 +96,7 @@ object PngChunkUtils {
     fun injectJsonIntoPng(originalPngBytes: ByteArray, jsonString: String): ByteArray {
         if (!isPng(originalPngBytes)) return originalPngBytes
 
-        val encodedValue = Base64.getEncoder().encodeToString(
-            jsonString.toByteArray(StandardCharsets.UTF_8)
-        )
+        val encodedValue = encodeBase64(jsonString.toByteArray(StandardCharsets.UTF_8))
         val key = "chara"
         val textDataStream = ByteArrayOutputStream()
         textDataStream.write(key.toByteArray(StandardCharsets.US_ASCII))
@@ -166,9 +164,27 @@ object PngChunkUtils {
         return Pair(key, value)
     }
 
+    @SuppressLint("NewApi")
+    private fun encodeBase64(bytes: ByteArray): String {
+        return try {
+            android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+        } catch (_: Throwable) {
+            java.util.Base64.getEncoder().encodeToString(bytes)
+        }
+    }
+
+    @SuppressLint("NewApi")
+    private fun decodeBase64(str: String): ByteArray {
+        return try {
+            android.util.Base64.decode(str.trim(), android.util.Base64.DEFAULT)
+        } catch (_: Throwable) {
+            java.util.Base64.getDecoder().decode(str.trim())
+        }
+    }
+
     private fun decodeValue(rawValue: String): String {
         return try {
-            val decoded = Base64.getDecoder().decode(rawValue.trim())
+            val decoded = decodeBase64(rawValue)
             String(decoded, StandardCharsets.UTF_8)
         } catch (e: Exception) {
             // If it's not base64 encoded, return as raw UTF-8 string
