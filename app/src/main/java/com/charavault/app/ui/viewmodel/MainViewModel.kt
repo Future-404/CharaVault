@@ -1,21 +1,26 @@
 package com.charavault.app.ui.viewmodel
 
 import android.app.Application
+import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.charavault.app.data.local.CardEntity
 import com.charavault.app.data.model.CharacterCardV3
+import com.charavault.app.data.release.AvailableUpdate
+import com.charavault.app.data.release.UpdateChecker
 import com.charavault.app.data.repository.BatchImportResult
 import com.charavault.app.data.repository.CardRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import com.charavault.app.ui.theme.ThemeMode
 
 data class CardGroup(
     val title: String,
@@ -25,7 +30,63 @@ data class CardGroup(
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = CardRepository(application)
+    private val updateChecker = UpdateChecker(application)
     private val json = Json { ignoreUnknownKeys = true }
+
+    private val prefs = application.getSharedPreferences("charavault_settings", Context.MODE_PRIVATE)
+
+    private val _accentColorHex = MutableStateFlow(
+        prefs.getString("accent_color_hex", "#8B5CF6") ?: "#8B5CF6"
+    )
+    val accentColorHex: StateFlow<String> = _accentColorHex.asStateFlow()
+
+    fun updateAccentColor(hex: String) {
+        _accentColorHex.value = hex
+        prefs.edit().putString("accent_color_hex", hex).apply()
+    }
+
+    private val _themeMode = MutableStateFlow(
+        try {
+            ThemeMode.valueOf(prefs.getString("theme_mode", "SYSTEM") ?: "SYSTEM")
+        } catch (e: Exception) {
+            ThemeMode.SYSTEM
+        }
+    )
+    val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
+
+    fun updateThemeMode(mode: ThemeMode) {
+        _themeMode.value = mode
+        prefs.edit().putString("theme_mode", mode.name).apply()
+    }
+
+    private val _availableUpdate = MutableStateFlow<AvailableUpdate?>(null)
+    val availableUpdate: StateFlow<AvailableUpdate?> = _availableUpdate.asStateFlow()
+
+    private var hasCheckedForUpdates = false
+
+    fun checkForUpdates() {
+        if (hasCheckedForUpdates) return
+        hasCheckedForUpdates = true
+
+        viewModelScope.launch {
+            runCatching { updateChecker.check() }
+                .onSuccess { update ->
+                    val ignoredVersionCode = prefs.getLong("ignored_update_version_code", -1L)
+                    _availableUpdate.value = update?.takeIf { it.versionCode != ignoredVersionCode }
+                }
+        }
+    }
+
+    fun dismissUpdateNotice() {
+        _availableUpdate.value = null
+    }
+
+    fun ignoreAvailableUpdate() {
+        _availableUpdate.value?.let { update ->
+            prefs.edit().putLong("ignored_update_version_code", update.versionCode).apply()
+        }
+        _availableUpdate.value = null
+    }
 
     val searchQuery = MutableStateFlow("")
     val selectedTagFilter = MutableStateFlow<String?>(null)
@@ -67,15 +128,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         tagMap.forEach { (tag, list) ->
+            list.sortBy { card ->
+                try {
+                    json.decodeFromString<Map<String, Int>>(card.categorySortOrdersJson)[tag] ?: Int.MAX_VALUE
+                } catch (_: Exception) {
+                    Int.MAX_VALUE
+                }
+            }
             resultGroups.add(CardGroup(title = tag, cards = list))
         }
 
         resultGroups
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun reorderCards(cardIdsInOrder: List<String>) {
+    fun reorderCards(category: String, cardIdsInOrder: List<String>) {
         viewModelScope.launch {
-            repository.updateCardsOrder(cardIdsInOrder)
+            repository.updateCardsOrder(category, cardIdsInOrder)
         }
     }
 
@@ -101,6 +169,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun updateCardTags(cardId: String, newTags: List<String>) {
         viewModelScope.launch {
             repository.updateCardTags(cardId, newTags)
+        }
+    }
+
+    fun updateCardAvatar(cardId: String, imageUri: Uri, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val success = repository.updateCardAvatar(getApplication(), cardId, imageUri)
+            onResult(success)
         }
     }
 
