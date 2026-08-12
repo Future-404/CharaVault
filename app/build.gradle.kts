@@ -5,6 +5,13 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+val appVersionName = providers.gradleProperty("app.versionName").orElse("1.0.0")
+val appVersionCode = providers.gradleProperty("app.versionCode").map(String::toInt).orElse(1)
+val releaseKeystorePath = providers.environmentVariable("RELEASE_KEYSTORE_PATH")
+val releaseStorePassword = providers.environmentVariable("RELEASE_STORE_PASSWORD")
+val releaseKeyAlias = providers.environmentVariable("RELEASE_KEY_ALIAS")
+val releaseKeyPassword = providers.environmentVariable("RELEASE_KEY_PASSWORD")
+
 android {
     namespace = "com.charavault.app"
     compileSdk = 34
@@ -13,8 +20,8 @@ android {
         applicationId = "com.charavault.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = appVersionCode.get()
+        versionName = appVersionName.get()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -22,9 +29,24 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            if (releaseKeystorePath.isPresent) {
+                storeFile = file(releaseKeystorePath.get())
+                storePassword = releaseStorePassword.orNull
+                keyAlias = releaseKeyAlias.orNull
+                keyPassword = releaseKeyPassword.orNull
+            }
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (releaseKeystorePath.isPresent && releaseStorePassword.isPresent &&
+                releaseKeyAlias.isPresent && releaseKeyPassword.isPresent
+            ) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -70,6 +92,9 @@ dependencies {
 
     // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+
+    // JTokkit Official BPE Tiktoken Tokenizer Library for OpenAI/LLM Token Counting
+    implementation("com.knuddels:jtokkit:1.1.0")
 
     // Room Database
     val roomVersion = "2.6.1"
