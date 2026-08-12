@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -31,6 +32,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -40,11 +42,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.shape.CircleShape
 import com.charavault.app.data.model.CharacterBookEntry
 
 /**
@@ -54,11 +60,13 @@ import com.charavault.app.data.model.CharacterBookEntry
 @Composable
 fun LorebookEntryItem(
     entry: CharacterBookEntry,
-    index: Int
+    index: Int,
+    onEdit: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     var isExpanded by remember { mutableStateOf(false) }
     val title = entry.comment.ifBlank { "词条 #${index + 1}" }
+    val isEnabled = entry.enabled
 
     val rotationState = if (isExpanded) 180f else 0f
 
@@ -66,27 +74,45 @@ fun LorebookEntryItem(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
+            .clickable { isExpanded = !isExpanded }
             .animateContentSize(),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.6f))
+        colors = CardDefaults.cardColors(
+            containerColor = if (isEnabled)
+                MaterialTheme.colorScheme.surfaceVariant
+            else
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
+        )
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(10.dp)) {
             // Entry Header
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { isExpanded = !isExpanded },
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = title,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White
-                    )
-                    
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = title,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isEnabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(
+                                    color = if (isEnabled) Color(0xFF22C55E) else Color(0xFFEF4444),
+                                    shape = CircleShape
+                                )
+                                .semantics {
+                                    contentDescription = if (isEnabled) "已启用" else "已禁用"
+                                }
+                        )
+                    }
+
                     // Display Trigger Keys
                     if (entry.keys.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(4.dp))
@@ -98,13 +124,7 @@ fun LorebookEntryItem(
                                 Text(
                                     text = "#$key",
                                     fontSize = 10.sp,
-                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
-                                    modifier = Modifier
-                                        .background(
-                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                                            RoundedCornerShape(4.dp)
-                                        )
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    color = if (isEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
                                 )
                             }
                         }
@@ -112,6 +132,17 @@ fun LorebookEntryItem(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    onEdit?.let {
+                        IconButton(onClick = it, modifier = Modifier.size(28.dp)) {
+                            Icon(
+                                Icons.Filled.Edit,
+                                contentDescription = "编辑词条",
+                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+
                     IconButton(
                         onClick = {
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -123,7 +154,7 @@ fun LorebookEntryItem(
                         Icon(
                             Icons.Filled.ContentCopy,
                             contentDescription = "Copy",
-                            tint = Color.White.copy(alpha = 0.6f),
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                             modifier = Modifier.size(16.dp)
                         )
                     }
@@ -131,7 +162,7 @@ fun LorebookEntryItem(
                     Icon(
                         imageVector = Icons.Filled.KeyboardArrowDown,
                         contentDescription = "Expand Entry",
-                        tint = Color.White.copy(alpha = 0.7f),
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                         modifier = Modifier
                             .size(20.dp)
                             .rotate(rotationState)
@@ -145,15 +176,100 @@ fun LorebookEntryItem(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
                             .padding(10.dp)
                     ) {
                         Text(
-                            text = entry.content,
+                            text = entry.content.ifBlank { "(正文为空)" },
                             fontSize = 12.sp,
-                            color = Color.White.copy(alpha = 0.85f),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
                             lineHeight = 18.sp
                         )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Advanced Rules Mini Badges (Pure Plain Text)
+                    val positionLabel = when (entry.position) {
+                        "before_char" -> "位置: 角色前"
+                        "after_char" -> "位置: 角色后"
+                        "an_top" -> "位置: 附言顶"
+                        "an_bottom" -> "位置: 附言底"
+                        else -> "位置: ${entry.position}"
+                    }
+
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        // Position badge
+                        Text(
+                            text = positionLabel,
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                            modifier = Modifier
+                                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(4.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+
+                        // Order badge
+                        Text(
+                            text = "顺序: ${entry.insertionOrder}",
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                            modifier = Modifier
+                                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(4.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+
+                        if (entry.useRegex) {
+                            Text(
+                                text = "正则匹配",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), RoundedCornerShape(4.dp))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+
+                        if (entry.constant) {
+                            Text(
+                                text = "常驻注入",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.secondary,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f), RoundedCornerShape(4.dp))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+
+                        if (entry.selective) {
+                            Text(
+                                text = "选择性触发",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.tertiary,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f), RoundedCornerShape(4.dp))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+
+                        if (entry.secondaryKeys.isNotEmpty()) {
+                            entry.secondaryKeys.forEach { secKey ->
+                                Text(
+                                    text = "次要: #$secKey",
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                    modifier = Modifier
+                                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(4.dp))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }

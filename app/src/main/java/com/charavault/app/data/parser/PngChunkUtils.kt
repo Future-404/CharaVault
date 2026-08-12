@@ -31,11 +31,31 @@ object PngChunkUtils {
         if (!isPng(bytes)) return null
 
         val jsonStr = extractRawJsonFromPngBytes(bytes) ?: return null
+        return parseRawJsonToV3(jsonStr)
+    }
+
+    /**
+     * Parse raw JSON string (V3 spec or V2 CardData) into CharacterCardV3
+     */
+    fun parseRawJsonToV3(jsonStr: String): CharacterCardV3? {
         return try {
-            jsonParser.decodeFromString<CharacterCardV3>(jsonStr)
+            val v3 = jsonParser.decodeFromString<CharacterCardV3>(jsonStr)
+            if (v3.spec == "chara_card_v3" || v3.data.name.isNotBlank() || v3.data.description.isNotBlank() || v3.data.firstMes.isNotBlank()) {
+                v3
+            } else {
+                null
+            }
         } catch (e: Exception) {
-            e.printStackTrace()
-            null
+            try {
+                val data = jsonParser.decodeFromString<com.charavault.app.data.model.CardData>(jsonStr)
+                if (data.name.isNotBlank() || data.description.isNotBlank() || data.personality.isNotBlank() || data.firstMes.isNotBlank() || data.scenario.isNotBlank()) {
+                    CharacterCardV3(data = data)
+                } else {
+                    null
+                }
+            } catch (e2: Exception) {
+                null
+            }
         }
     }
 
@@ -56,7 +76,7 @@ object PngChunkUtils {
 
             val dataBytes = ByteArray(length)
             buffer.get(dataBytes)
-            val crc = buffer.int // skip CRC
+            buffer.int // skip CRC
 
             if (type == "tEXt" || type == "iTXt") {
                 val parsed = parseTextChunk(dataBytes)
@@ -76,7 +96,9 @@ object PngChunkUtils {
     fun injectJsonIntoPng(originalPngBytes: ByteArray, jsonString: String): ByteArray {
         if (!isPng(originalPngBytes)) return originalPngBytes
 
-        val encodedValue = Base64.getEncoder().encodeToString(jsonString.toByteArray(StandardCharsets.UTF_8))
+        val encodedValue = Base64.getEncoder().encodeToString(
+            jsonString.toByteArray(StandardCharsets.UTF_8)
+        )
         val key = "chara"
         val textDataStream = ByteArrayOutputStream()
         textDataStream.write(key.toByteArray(StandardCharsets.US_ASCII))
@@ -100,7 +122,7 @@ object PngChunkUtils {
 
             val dataBytes = ByteArray(length)
             buffer.get(dataBytes)
-            val crc = buffer.int
+            buffer.int // skip CRC
 
             if (type == "tEXt") {
                 val parsed = parseTextChunk(dataBytes)

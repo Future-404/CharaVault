@@ -14,6 +14,10 @@ import java.util.Locale
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
+enum class ExportFormat {
+    PNG, JSON
+}
+
 object ExportManager {
 
     /**
@@ -36,6 +40,22 @@ object ExportManager {
                 sourceFile.inputStream().use { input ->
                     input.copyTo(output)
                 }
+            }
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    /**
+     * Export a single character card raw V3 JSON spec file (.json) to target Uri
+     */
+    suspend fun exportSingleCardJsonToUri(context: Context, card: CardEntity, targetUri: Uri): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val jsonString = card.rawJsonData
+            context.contentResolver.openOutputStream(targetUri)?.use { output ->
+                output.write(jsonString.toByteArray(Charsets.UTF_8))
             }
             true
         } catch (e: Exception) {

@@ -87,16 +87,16 @@ fun AccordionSection(
                         text = title,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     if (countBadge != null) {
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = countBadge,
                             fontSize = 12.sp,
-                            color = Color.White.copy(alpha = 0.5f),
+                            color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier
-                                .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
                                 .padding(horizontal = 8.dp, vertical = 2.dp)
                         )
                     }
@@ -110,7 +110,7 @@ fun AccordionSection(
                     Icon(
                         imageVector = Icons.Filled.KeyboardArrowDown,
                         contentDescription = if (isExpanded) "Collapse" else "Expand",
-                        tint = Color.White.copy(alpha = 0.7f),
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                         modifier = Modifier
                             .size(24.dp)
                             .rotate(rotationState)

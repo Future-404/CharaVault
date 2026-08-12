@@ -16,4 +16,3 @@ val SurfaceDark = Color(0xFF191822)
 val CardSurface = Color(0xFF232230)
 val PrimaryAccent = Color(0xFF8B5CF6) // Deep Violet
 val SecondaryAccent = Color(0xFFEC4899) // Pink Accent
-val GoldStar = Color(0xFFF59E0B) // Favorite Star

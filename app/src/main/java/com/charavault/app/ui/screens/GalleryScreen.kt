@@ -151,7 +151,7 @@ fun GalleryScreen(
                         ) {
                             // Submenu 0: Import Cards
                             DropdownMenuItem(
-                                text = { Text("批量导入角色卡", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold) },
+                                text = { Text("批量导入（PNG / JSON / ZIP）", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold) },
                                 leadingIcon = {
                                     Icon(
                                         Icons.Filled.Add,
@@ -487,10 +487,10 @@ fun BatchImportCategorySelectDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("批量导入角色卡 ($count 张)", fontSize = 18.sp, fontWeight = FontWeight.Bold) },
+        title = { Text("批量导入角色卡 ($count 个选择)", fontSize = 18.sp, fontWeight = FontWeight.Bold) },
         text = {
             Column {
-                Text("即将进行合规检查并导入 $count 张角色卡，请选择或新建归属的分类货架：", fontSize = 13.sp, color = Color.Gray)
+                Text("即将读取选中的文件/压缩包（支持 PNG / JSON / ZIP）进行合规检查与解包导入，请选择或新建归属的分类：", fontSize = 13.sp, color = Color.Gray)
                 Spacer(modifier = Modifier.height(10.dp))
 
                 // Custom Tag Input Row

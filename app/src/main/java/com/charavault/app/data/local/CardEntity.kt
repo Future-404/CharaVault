@@ -8,7 +8,8 @@ import androidx.room.PrimaryKey
     tableName = "cards",
     indices = [
         Index(value = ["fileHash"]),
-        Index(value = ["semanticHash"])
+        Index(value = ["semanticHash"]),
+        Index(value = ["normalizedJsonHash"])
     ]
 )
 data class CardEntity(
@@ -22,13 +23,14 @@ data class CardEntity(
     val firstMes: String,
     val systemPrompt: String,
     val tagsJson: String,
+    val categorySortOrdersJson: String = "{}",
     val alternateGreetingsJson: String,
     val rawJsonData: String,
     val imagePath: String,
     val fileHash: String = "",
+    val normalizedJsonHash: String = "",
     val semanticHash: String = "",
     val sortOrder: Int = 0,
-    val isFavorite: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )

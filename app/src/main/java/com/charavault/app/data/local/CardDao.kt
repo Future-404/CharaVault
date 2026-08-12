@@ -20,8 +20,14 @@ interface CardDao {
     @Query("SELECT * FROM cards WHERE fileHash = :fileHash LIMIT 1")
     suspend fun getCardByFileHash(fileHash: String): CardEntity?
 
+    @Query("SELECT * FROM cards WHERE normalizedJsonHash = :normalizedJsonHash LIMIT 1")
+    suspend fun getCardByNormalizedJsonHash(normalizedJsonHash: String): CardEntity?
+
     @Query("SELECT * FROM cards WHERE semanticHash = :semanticHash LIMIT 1")
     suspend fun getCardBySemanticHash(semanticHash: String): CardEntity?
+
+    @Query("SELECT * FROM cards WHERE normalizedJsonHash = ''")
+    suspend fun getCardsMissingNormalizedJsonHash(): List<CardEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCard(card: CardEntity)
@@ -29,11 +35,11 @@ interface CardDao {
     @Update
     suspend fun updateCard(card: CardEntity)
 
+    @Update
+    suspend fun updateCards(cards: List<CardEntity>)
+
     @Query("UPDATE cards SET sortOrder = :sortOrder WHERE id = :id")
     suspend fun updateSortOrder(id: String, sortOrder: Int)
-
-    @Query("UPDATE cards SET isFavorite = :isFavorite, updatedAt = :updatedAt WHERE id = :id")
-    suspend fun setFavorite(id: String, isFavorite: Boolean, updatedAt: Long = System.currentTimeMillis())
 
     @Delete
     suspend fun deleteCard(card: CardEntity)

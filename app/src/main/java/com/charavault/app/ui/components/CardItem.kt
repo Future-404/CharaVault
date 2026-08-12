@@ -56,6 +56,8 @@ fun CardItem(
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
                     .data(File(card.imagePath))
+                    .diskCacheKey("${card.id}_${card.fileHash}_${card.updatedAt}")
+                    .memoryCacheKey("${card.id}_${card.fileHash}_${card.updatedAt}")
                     .crossfade(true)
                     .build(),
                 contentDescription = card.name,
